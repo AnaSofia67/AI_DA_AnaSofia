@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+/Users/anasofi/Desktop/AI_DA_AnaSofia/data/NYPD_Arrests_Data__Historic_.csv
+
 # C extensions
 *.so
 
