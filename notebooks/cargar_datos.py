@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import pandas as pd
 from matplotlib.colors import LinearSegmentedColormap
 
@@ -141,24 +142,32 @@ for grupo in edades_comparables:
     porcentaje = cantidad / int(totales_delito_edad.loc[grupo]) * 100
     print(f"{grupo}: {delito} ({cantidad:,}; {porcentaje:.2f}% del grupo)")
 
-fig, ax = plt.subplots(figsize=(12, 7))
-cmap_rosa = LinearSegmentedColormap.from_list(
-    "rosa_delitos", ["#fff1f6", "#ff8fc1", "#c90061"]
-)
-imagen = ax.imshow(porcentajes_edad_delito.values, cmap=cmap_rosa, aspect="auto")
+top_5_delitos_edad = top_10_delitos_edad[:5]
+porcentajes_top_5_edad = porcentajes_edad_delito.loc[top_5_delitos_edad]
+colores_delitos = ["#ff1493", "#e60073", "#c90061", "#a90050", "#7f003f"]
+ancho_barra = 0.15
+fig, ax = plt.subplots(figsize=(14, 6))
+for indice, delito in enumerate(top_5_delitos_edad):
+    posiciones = [
+        grupo + (indice - (len(top_5_delitos_edad) - 1) / 2) * ancho_barra
+        for grupo in range(len(edades_comparables))
+    ]
+    ax.bar(
+        posiciones,
+        porcentajes_top_5_edad.loc[delito].values,
+        width=ancho_barra,
+        color=colores_delitos[indice],
+        label=delito,
+    )
 ax.set_xticks(range(len(edades_comparables)), labels=edades_comparables)
-ax.set_yticks(range(len(top_10_delitos_edad)), labels=top_10_delitos_edad)
-ax.set_title("Diez delitos más frecuentes por grupo de edad")
+ax.set_title("Histograma de frecuencias: edad y delito")
 ax.set_xlabel("Grupo de edad")
-ax.set_ylabel("Descripción del delito")
-for fila in range(len(top_10_delitos_edad)):
-    for columna in range(len(edades_comparables)):
-        porcentaje = porcentajes_edad_delito.iat[fila, columna]
-        color_texto = "white" if porcentaje > porcentajes_edad_delito.values.max() * 0.55 else "#4a1830"
-        ax.text(columna, fila, f"{porcentaje:.1f}%", ha="center", va="center", color=color_texto, fontsize=8)
-fig.colorbar(imagen, ax=ax, label="Porcentaje de arrestos del grupo")
-fig.tight_layout()
-fig.savefig(OUTPUT_DIR / "02_edad_delito_rosa.png", dpi=150)
+ax.set_ylabel("Porcentaje de arrestos dentro del grupo")
+ax.grid(axis="y", alpha=0.25)
+ax.set_axisbelow(True)
+ax.legend(title="Delito", loc="upper left", bbox_to_anchor=(1.01, 1), fontsize=8)
+fig.tight_layout(rect=(0, 0, 0.77, 1))
+fig.savefig(OUTPUT_DIR / "02_histograma_edad_delito_rosa.png", dpi=150)
 plt.close(fig)
 
 sexos_comparables = ["F", "M"]
@@ -174,6 +183,9 @@ totales_delito_sexo = cruces_sexo_delito["PERP_SEX"].value_counts().reindex(
     sexos_comparables
 )
 porcentajes_sexo_delito = conteos_sexo_delito.div(totales_delito_sexo, axis="columns") * 100
+cmap_rosa = LinearSegmentedColormap.from_list(
+    "rosa_delitos", ["#fff1f6", "#ff8fc1", "#c90061"]
+)
 
 print("\nDelito más frecuente dentro de cada sexo registrado:")
 for sexo in sexos_comparables:
@@ -184,17 +196,174 @@ for sexo in sexos_comparables:
     porcentaje = cantidad / int(totales_delito_sexo.loc[sexo]) * 100
     print(f"{sexo}: {delito} ({cantidad:,}; {porcentaje:.2f}% del grupo)")
 
-fig, ax = plt.subplots(figsize=(9, 7))
-imagen = ax.imshow(porcentajes_sexo_delito.values, cmap=cmap_rosa, aspect="auto")
-ax.set_xticks(range(len(sexos_comparables)), labels=["F (mujer)", "M (hombre)"])
-ax.set_yticks(range(len(top_10_delitos_sexo)), labels=top_10_delitos_sexo)
-ax.set_title("Diez delitos más frecuentes por sexo registrado")
-ax.set_xlabel("Sexo registrado")
+top_5_delitos_sexo = top_10_delitos_sexo[:5]
+porcentajes_top_5_sexo = porcentajes_sexo_delito.loc[top_5_delitos_sexo]
+fig, ax = plt.subplots(figsize=(11, 6))
+posiciones = list(range(len(top_5_delitos_sexo)))
+ancho_barra = 0.36
+for sexo, desplazamiento, color in [
+    ("F", -ancho_barra / 2, "#ff1493"),
+    ("M", ancho_barra / 2, "#8f0056"),
+]:
+    porcentajes = porcentajes_top_5_sexo[sexo].values
+    barras = ax.barh(
+        [indice + desplazamiento for indice in posiciones],
+        porcentajes,
+        height=ancho_barra,
+        color=color,
+        label=sexo,
+    )
+    ax.bar_label(barras, labels=[f"{valor:.1f}%" for valor in porcentajes], padding=3, fontsize=8)
+ax.set_yticks(posiciones, labels=top_5_delitos_sexo)
+ax.invert_yaxis()
+ax.set_title("Cinco delitos principales por sexo registrado")
+ax.set_xlabel("Porcentaje dentro de cada grupo")
 ax.set_ylabel("Descripción del delito")
-for fila in range(len(top_10_delitos_sexo)):
-    for columna in range(len(sexos_comparables)):
-        porcentaje = porcentajes_sexo_delito.iat[fila, columna]
-        color_texto = "white" if porcentaje > porcentajes_sexo_delito.values.max() * 0.55 else "#4a1830"
+ax.legend(title="Sexo registrado", labels=["F", "M"])
+ax.grid(axis="x", alpha=0.25)
+ax.set_axisbelow(True)
+fig.tight_layout()
+fig.savefig(OUTPUT_DIR / "03_bar_chart_delito_sexo_rosa.png", dpi=150)
+plt.close(fig)
+
+filas_scatter = df.loc[
+    df["AGE_GROUP"].isin(edades_comparables)
+    & df["PERP_SEX"].isin(sexos_comparables),
+    ["AGE_GROUP", "PERP_SEX", "OFNS_DESC"],
+]
+filas_scatter_validas = filas_scatter.dropna(subset=["OFNS_DESC"])
+top_delitos_scatter = filas_scatter_validas["OFNS_DESC"].value_counts().head(5).index
+pares_demograficos = pd.MultiIndex.from_product(
+    [edades_comparables, sexos_comparables], names=["AGE_GROUP", "PERP_SEX"]
+)
+conteos_scatter = pd.crosstab(
+    [filas_scatter_validas["AGE_GROUP"], filas_scatter_validas["PERP_SEX"]],
+    filas_scatter_validas["OFNS_DESC"],
+).reindex(index=pares_demograficos, columns=top_delitos_scatter, fill_value=0)
+denominadores_scatter = filas_scatter_validas.groupby(
+    ["AGE_GROUP", "PERP_SEX"]
+).size().reindex(pares_demograficos)
+porcentajes_scatter = conteos_scatter.div(denominadores_scatter, axis="index") * 100
+totales_demograficos = filas_scatter.groupby(
+    ["AGE_GROUP", "PERP_SEX"]
+).size().reindex(pares_demograficos)
+maximo_demografico = int(totales_demograficos.max())
+tamanos_burbujas = 35 + 220 * totales_demograficos / maximo_demografico
+colores_sexo = {"F": "#ff1493", "M": "#8f0056"}
+marcadores_delito = ["o", "s", "^", "D", "P"]
+
+fig, ax = plt.subplots(figsize=(14, 8))
+for indice_delito, delito in enumerate(top_delitos_scatter):
+    for sexo, desplazamiento in [("F", -0.12), ("M", 0.12)]:
+        posiciones = [
+            indice_edad + desplazamiento + (indice_delito - 2) * 0.025
+            for indice_edad in range(len(edades_comparables))
+        ]
+        pares = [(edad, sexo) for edad in edades_comparables]
+        ax.scatter(
+            posiciones,
+            [porcentajes_scatter.loc[par, delito] for par in pares],
+            s=[tamanos_burbujas.loc[par] for par in pares],
+            color=colores_sexo[sexo],
+            marker=marcadores_delito[indice_delito],
+            alpha=0.78,
+            edgecolors="white",
+            linewidths=0.6,
+            zorder=3,
+        )
+
+ax.set_xticks(
+    range(len(edades_comparables)),
+    labels=[f"{edad}\nn={int(conteos_edad.loc[edad]):,}" for edad in edades_comparables],
+)
+ax.set_xlim(-0.5, len(edades_comparables) - 0.5)
+ax.set_ylim(0, float(porcentajes_scatter.values.max()) * 1.25)
+ax.set_title("Scatterplot integrado: edad, delito y sexo")
+ax.set_xlabel("Grupo de edad y total de arrestos")
+ax.set_ylabel("Porcentaje dentro del grupo edad + sexo")
+ax.grid(axis="y", alpha=0.25)
+ax.set_axisbelow(True)
+
+leyenda_sexo = [
+    Line2D(
+        [0], [0], marker="o", linestyle="None", color=colores_sexo[sexo],
+        label=sexo, markersize=8,
+    )
+    for sexo in sexos_comparables
+]
+leyenda_delitos = [
+    Line2D(
+        [0], [0], marker=marcadores_delito[indice], linestyle="None",
+        color="#777777", markerfacecolor="#777777", label=delito, markersize=8,
+    )
+    for indice, delito in enumerate(top_delitos_scatter)
+]
+referencias_tamano = pd.Series(totales_demograficos).quantile([0.1, 0.5, 0.9])
+leyenda_tamanos = [
+    Line2D(
+        [0], [0], marker="o", linestyle="None", color="#999999",
+        markersize=(35 + 220 * cantidad / maximo_demografico) ** 0.5,
+        label=f"{cantidad / 1_000:.0f}k",
+    )
+    for cantidad in referencias_tamano
+]
+leyenda = ax.legend(
+    handles=leyenda_sexo,
+    title="Color: sexo",
+    loc="upper left",
+    bbox_to_anchor=(1.01, 1),
+)
+ax.add_artist(leyenda)
+leyenda = ax.legend(
+    handles=leyenda_delitos,
+    title="Forma: delito",
+    loc="upper left",
+    bbox_to_anchor=(1.01, 0.78),
+    fontsize=8,
+)
+ax.add_artist(leyenda)
+ax.legend(
+    handles=leyenda_tamanos,
+    title="Tamaño: arrestos edad + sexo",
+    loc="upper left",
+    bbox_to_anchor=(1.01, 0.38),
+    fontsize=8,
+)
+fig.text(
+    0.1,
+    0.015,
+    "Solo se muestran los cinco delitos principales; el porcentaje usa registros con delito informado.",
+    fontsize=9,
+)
+fig.tight_layout(rect=(0, 0.05, 0.74, 1))
+fig.savefig(OUTPUT_DIR / "08_scatterplot_tres_insights_rosa.png", dpi=150)
+plt.close(fig)
+
+valores_heatmap = porcentajes_scatter.T
+etiquetas_heatmap = []
+for edad in edades_comparables:
+    for sexo in sexos_comparables:
+        total_grupo = int(totales_demograficos.loc[(edad, sexo)])
+        total_corto = (
+            f"{total_grupo / 1_000_000:.1f}M"
+            if total_grupo >= 1_000_000
+            else f"{total_grupo / 1_000:.0f}k"
+        )
+        etiquetas_heatmap.append(f"{edad}\n{sexo}\nn={total_corto}")
+fig, ax = plt.subplots(figsize=(16, 7))
+imagen = ax.imshow(valores_heatmap.values, cmap=cmap_rosa, aspect="auto")
+ax.set_xticks(range(len(etiquetas_heatmap)), labels=etiquetas_heatmap)
+ax.tick_params(axis="x", labelsize=8)
+ax.set_yticks(range(len(top_delitos_scatter)), labels=top_delitos_scatter)
+ax.set_title("Heatmap integrado: edad, delito y sexo")
+ax.set_xlabel("Edad y sexo registrados")
+ax.set_ylabel("Cinco delitos más frecuentes")
+for separador in range(1, len(edades_comparables)):
+    ax.axvline(separador * len(sexos_comparables) - 0.5, color="white", linewidth=2)
+for fila in range(len(top_delitos_scatter)):
+    for columna in range(len(etiquetas_heatmap)):
+        porcentaje = valores_heatmap.iat[fila, columna]
+        color_texto = "white" if porcentaje > valores_heatmap.values.max() * 0.55 else "#4a1830"
         ax.text(
             columna,
             fila,
@@ -204,9 +373,15 @@ for fila in range(len(top_10_delitos_sexo)):
             color=color_texto,
             fontsize=8,
         )
-fig.colorbar(imagen, ax=ax, label="Porcentaje de arrestos del grupo")
-fig.tight_layout()
-fig.savefig(OUTPUT_DIR / "03_sexo_delito_rosa.png", dpi=150)
+fig.colorbar(imagen, ax=ax, label="Porcentaje dentro de edad + sexo")
+fig.text(
+    0.1,
+    0.015,
+    "n indica arrestos del grupo; los porcentajes excluyen descripciones de delito faltantes.",
+    fontsize=9,
+)
+fig.tight_layout(rect=(0, 0.06, 1, 1))
+fig.savefig(OUTPUT_DIR / "09_heatmap_tres_insights_rosa.png", dpi=150)
 plt.close(fig)
 
 df["ARREST_DATE"] = pd.to_datetime(df["ARREST_DATE"], format="%m/%d/%Y")
@@ -254,29 +429,15 @@ fig.tight_layout()
 fig.savefig(OUTPUT_DIR / "06_delitos_mas_frecuentes.png", dpi=150)
 plt.close(fig)
 
-perfil = pd.crosstab(df["AGE_GROUP"], df["PERP_SEX"])
-orden_edades = ["<18", "18-24", "25-44", "45-64", "65+", "UNKNOWN"]
-perfil = perfil.reindex([edad for edad in orden_edades if edad in perfil.index])
-fig, ax = plt.subplots(figsize=(10, 5))
-perfil.plot(kind="bar", ax=ax, color={"F": "#d95f02", "M": "#1b9e77"})
-ax.set_title("Arrestos por grupo de edad y sexo")
-ax.set_xlabel("Grupo de edad")
-ax.set_ylabel("Arrestos")
-ax.tick_params(axis="x", rotation=0)
-ax.legend(title="Sexo")
-ax.grid(axis="y", alpha=0.25)
-fig.tight_layout()
-fig.savefig(OUTPUT_DIR / "07_perfil_edad_sexo.png", dpi=150)
-plt.close(fig)
-
 print(f"\nGráficas guardadas en: {OUTPUT_DIR}")
 for filename in [
     "01_grupos_de_edad_rosa.png",
-    "02_edad_delito_rosa.png",
-    "03_sexo_delito_rosa.png",
+    "02_histograma_edad_delito_rosa.png",
+    "03_bar_chart_delito_sexo_rosa.png",
     "04_arrestos_por_mes.png",
     "05_arrestos_por_borough.png",
     "06_delitos_mas_frecuentes.png",
-    "07_perfil_edad_sexo.png",
+    "08_scatterplot_tres_insights_rosa.png",
+    "09_heatmap_tres_insights_rosa.png",
 ]:
     print(f"- {filename}")
